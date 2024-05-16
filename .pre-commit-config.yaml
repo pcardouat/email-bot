@@ -44,7 +44,7 @@ repos:
     rev: 6.1.1
     hooks:
         - id: pydocstyle
-          args: [ "--mqtch-dir='src'"]
+          args: [ "--match-dir='src'"]
 
 default_stages:
     - commit

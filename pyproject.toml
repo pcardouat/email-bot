@@ -1,0 +1,23 @@
+[tool.isort]
+src_paths = ["src","tests"]
+profile = "black"
+skip = ["tests/resources"]
+
+[tool.black]
+line-length = 120
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  | ^.*\.(yaml)
+)/
+'''
+
+[tool.flake8]
+count = true
+max-line-length = 120
+max-complexity = 1
+ignore = ["E203", "E127", "E128", "E231", "E800", "F811", "F841", "W291", "W503", "W504", "W605", "C901"]
+
+[tool.mypy]
+files = ["src","tests"]
+ignore_missing_imports = true
