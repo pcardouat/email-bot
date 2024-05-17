@@ -7,6 +7,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from tqdm import tqdm
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 
@@ -192,7 +193,7 @@ class EmailHandler:
         results = self.search_messages("")
         print(f"Found {len(results)} results.")
         # for each email matched, read it (output plain/text to console & save HTML and attachments)
-        for msg in results:
+        for msg in tqdm(results):
             self.read_message(msg)
 
     def initialise_set_up(self):

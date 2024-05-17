@@ -161,4 +161,5 @@ cython_debug/
 .DS_Store
 
 # Other files
-data/
+data/*
+!data/.gitkeep
