@@ -2,5 +2,6 @@ google-api-python-client
 google-auth-httplib2
 google-auth-oauthlib
 langchain
+langchain-community
 pre-commit==3.6.0
 tqdm
