@@ -165,3 +165,4 @@ data/*
 !data/.gitkeep
 credentials/*
 !credentials/.gitkeep
+llm/*.llamafile
