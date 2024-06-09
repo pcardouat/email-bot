@@ -9,15 +9,14 @@ GRAY ?= \033[0;37m
 COFF ?= \033[0m
 
 PYTHON_INTERPRETER = python3
-TESTS_FOLDER=tests
 SOURCE_FOLDER=src
 
 PYTHON=$(shell command -v python3)
 
-PYTHON_VERSION_MIN=3.12
+PYTHON_VERSION_MIN=3.9
 
 # Create virtual environment and install dependencies
-environment-dev:
+environment:
 ifeq (,$(wildcard .venv))
 		@printf ">>> No virtual environment found in project directory \n"
 		@printf ">>> Creating virtual environment for the project...\n"
