@@ -163,3 +163,5 @@ cython_debug/
 # Other files
 data/*
 !data/.gitkeep
+credentials/*
+!credentials/.gitkeep
