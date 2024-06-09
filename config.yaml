@@ -1,0 +1,18 @@
+llm:
+  model:
+    model_url: https://huggingface.co/jartine/Phi-3-mini-4k-instruct-llamafile/resolve/main/Phi-3-mini-4k-instruct.Q4_K_M.llamafile
+    model_name: Phi-3-mini-4k-instruct.Q4_K_M.llamafile
+  model_config:
+    temperature: 0.1
+    top_k: 10
+email:
+  token_path: ./credentials/token.pickle
+  credentials_path: ./credentials/credentials.json
+  scopes: ['https://www.googleapis.com/auth/gmail.readonly']
+rag:
+  model: lewispons/email-classifiers
+  nb_docs_returned: 5
+  fetch_k_docs: 200
+  chunk_size: 1000
+  chunk_overlap: 20
+  threshold: 0.8
