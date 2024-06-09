@@ -1,9 +1,10 @@
 """Classes to handle email interactions."""
 import os
+import pickle
 from base64 import urlsafe_b64decode
 
+from bs4 import BeautifulSoup
 from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -12,17 +13,44 @@ from tqdm import tqdm
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 
 
+def convert_html_to_text(html_string: str) -> str:
+    """Convert a html string to a readable and understandable text."""
+    soup = BeautifulSoup(html_string, features="html.parser")
+    soup.prettify(formatter=lambda s: s.replace("\xa0", " "))
+
+    # kill all script and style elements
+    for script in soup(["script", "style"]):
+        script.extract()  # rip it out
+
+    # get text
+    text = soup.get_text()
+
+    # break into lines and remove leading and trailing space on each
+    lines = (line.strip() for line in text.splitlines())
+    # break multi-headlines into a line each
+    chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+    # drop blank lines
+    text = "\n".join(chunk for chunk in chunks if chunk)
+    index = text.find("-------")
+    if index != -1:
+        return text[:index]
+
+    return text
+
+
 class EmailHandler:
     """Basic class to communicate with the Gmail API."""
 
-    def __init__(self, token_path: str, scopes: list) -> None:
+    def __init__(self, token_path: str, credentials_path: str, scopes: list) -> None:
         """Initialise the email handler.
 
         Args:
+            credentials_path (str): path to the credentials to access the API.
             token_path (str): path to the file containing the access and refresh tokens.
             scopes (list): list of scope for interacting with the API.
         """
         self.token_path = token_path
+        self.credentials_path = credentials_path
         self.scopes = scopes
         self.service = None
 
@@ -30,17 +58,18 @@ class EmailHandler:
         """Set the connection to the service."""
         creds = None
         if os.path.exists(self.token_path):
-            creds = Credentials.from_authorized_user_file(self.token_path, self.scopes)
+            with open(self.token_path, "rb") as token:
+                creds = pickle.load(token)
         # If there are no (valid) credentials available, let the user log in.
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
             else:
-                flow = InstalledAppFlow.from_client_secrets_file("credentials.json", self.scopes)
+                flow = InstalledAppFlow.from_client_secrets_file(self.credentials_path, self.scopes)
                 creds = flow.run_local_server(port=0)
             # Save the credentials for the next run
-            with open(self.token_path, "w") as token:
-                token.write(creds.to_json())
+            with open(self.token_path, "wb") as token:
+                pickle.dump(creds, token)
 
         try:
             # Call the Gmail API
@@ -66,7 +95,7 @@ class EmailHandler:
         """Create a folder name where to save a file with special characters removed from the text."""
         return "".join(c if c.isalnum() else "_" for c in text)
 
-    def parse_parts(self, parts, folder_name, message):
+    def parse_parts(self, parts, folder_name, message, text):
         """Parse the content of an email partition."""
         if parts:
             for part in parts:
@@ -79,24 +108,30 @@ class EmailHandler:
                 if part.get("parts"):
                     # recursively call this function when we see that a part
                     # has parts inside
-                    self.parse_parts(part.get("parts"), folder_name, message)
+                    self.parse_parts(part.get("parts"), folder_name, message, text)
                 if mimeType == "text/plain":
                     # if the email part is text plain
                     if data:
-                        text = urlsafe_b64decode(data).decode()
+                        email_content = urlsafe_b64decode(data).decode()
                         if not filename:
                             filename = "email.txt"
                         filepath = os.path.join(folder_name, filename)
-                        with open(filepath, "wb") as f:
-                            f.write(text)
+                        with open(filepath, "w") as f:
+                            f.write(text + email_content)
                 elif mimeType == "text/html":
                     # if the email part is an HTML content
                     # save the HTML file and optionally open it in the browser
                     if not filename:
-                        filename = "index.html"
+                        filename = "email.txt"
                     filepath = os.path.join(folder_name, filename)
-                    with open(filepath, "wb") as f:
-                        f.write(urlsafe_b64decode(data))
+                    with open(filepath, "w") as f:
+                        try:
+                            html_content = urlsafe_b64decode(data).decode()
+                        except TypeError as e:
+                            print(f"Could not decode the html content of the email: {e}")
+                            html_content = ""
+                        email_content = convert_html_to_text(html_content)
+                        f.write(text + email_content)
                 else:
                     # attachment other than a plain text or HTML
                     for part_header in part_headers:
@@ -159,11 +194,20 @@ class EmailHandler:
         parts = payload.get("parts")
         folder_name = "email"
         has_subject = False
+        text = ""
         if headers:
             # this section prints email basic info & creates a folder for the email
             for header in headers:
                 name = header.get("name")
                 value = header.get("value")
+                if name.lower() == "from":
+                    text += f"From: {value} \n"
+                if name.lower() == "to":
+                    # we print the To address
+                    text += f"To: {value} \n"
+                if name.lower() == "date":
+                    # we print the date when the message was sent
+                    text += f"Date: {value} \n\n"
                 if name.lower() == "subject":
                     # make our boolean True, the email has "subject"
                     has_subject = True
@@ -180,13 +224,19 @@ class EmailHandler:
                             folder_name = f"{folder_name[:-3]}_{folder_counter}"
                         else:
                             folder_name = f"{folder_name}_{folder_counter}"
-                    os.mkdir(folder_name)
+                    try:
+                        os.mkdir(folder_name)
+                    except OSError as e:
+                        print(f"Could not save email to folder {folder_name}: {e}")
+                        print(f"Email informations: {text}")
+                        return
+                    text += f"Subject: {value} \n"
         if not has_subject:
             # if the email does not have a subject, then make a folder with "email" name
             # since folders are created based on subjects
             if not os.path.isdir(folder_name):
                 os.mkdir(folder_name)
-        self.parse_parts(parts, folder_name, message)
+        self.parse_parts(parts, folder_name, message, text)
 
     def get_mails(self):
         """Get all emails."""
