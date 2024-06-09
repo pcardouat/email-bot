@@ -1,5 +1,6 @@
 """Class to handle everything related to the LLM."""
 import os
+import platform
 import subprocess
 
 import requests
@@ -34,6 +35,9 @@ class LLMHandler:
         print("Download successful")
         # Change the file permission to make it executable
         print("Making the llamafile executable")
+        if platform.system() == "Windows":
+            pass
+            # TODO: make the file executable for Windows users
         try:
             subprocess.run(["sudo", "chmod", "+x", os.path.join(LLM_DIR, self.model_name)], check=True)
             print("Llamafile set up done.")
